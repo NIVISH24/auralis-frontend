@@ -22,3 +22,15 @@ body {
   background: var(--background);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+::-webkit-scrollbar-thumb {
+  background-color: var(--foreground);
+  /* Set the thumb color */
+  border-radius: 10px;
+  /* Optional: rounded corners */
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+
+}
