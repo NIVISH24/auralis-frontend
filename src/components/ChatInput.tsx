@@ -8,7 +8,7 @@ interface ChatInputProps {
   value: string;
   onChange: (text: string) => void;
   onSendChunk: (text: string) => void;
-  onSendMessage: () => void;
+  onSendMessage: (message: string) => void;
 }
 
 const ChatInput: FC<ChatInputProps> = ({ value, onChange, onSendChunk }) => {
