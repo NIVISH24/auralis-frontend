@@ -6,28 +6,18 @@ import ChatInput from "@/components/ChatInput";
 import { FaMicrophone } from "react-icons/fa";
 import { motion } from "framer-motion";
 
-const AiTeaches = () => {
+const StudentTeaches = () => {
   const [messages, setMessages] = useState<
     { text: string; sender: "user" | "ai" }[]
   >([]);
   const [isModalOpen, setIsModalOpen] = useState(true);
   const [tags, setTags] = useState<string[]>([]);
   const [autoSearch, setAutoSearch] = useState(false);
+  const [inputValue, setInputValue] = useState("");
+
   const messageContainerRef = useRef<HTMLDivElement>(null);
-
-  const handleSendMessage = (message: string) => {
-    setMessages((prevMessages) => [
-      ...prevMessages,
-      { text: message, sender: "user" },
-    ]);
-
-    setTimeout(() => {
-      setMessages((prevMessages) => [
-        ...prevMessages,
-        { text: `AI Response to: ${message}`, sender: "ai" },
-      ]);
-    }, 1000);
-  };
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const unsentWordsRef = useRef<string[]>([]);
 
   useEffect(() => {
     if (messageContainerRef.current) {
@@ -36,25 +26,68 @@ const AiTeaches = () => {
     }
   }, [messages]);
 
-  const handleAddTag = (tag: string) => {
-    if (tag.trim() && !tags.includes(tag)) {
-      setTags((prevTags) => [...prevTags, tag]);
+  const sendPostRequest = async (text: string) => {
+    setMessages((prev) => [...prev, { text, sender: "user" }]);
+
+    try {
+      const response = await fetch("/api/interrupt", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_input: text }),
+      });
+      const data = await response.json();
+      if (data.response) {
+        setMessages((prev) => [...prev, { text: data.response, sender: "ai" }]);
+      } else {
+        setMessages((prev) => [
+          ...prev,
+          { text: "No response from server.", sender: "ai" },
+        ]);
+      }
+    } catch (error) {
+      console.error("Error sending post request:", error);
+      setMessages((prev) => [
+        ...prev,
+        { text: "Error sending post request.", sender: "ai" },
+      ]);
     }
   };
 
-  const handleDeleteTag = (tag: string) => {
-    setTags((prevTags) => prevTags.filter((t) => t !== tag));
-  };
+  const handleInputChange = (text: string) => {
+    setInputValue(text);
 
-  const handleTagInputChange = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
-      handleAddTag((e.target as HTMLInputElement).value);
-      (e.target as HTMLInputElement).value = "";
+    const words = text.trim().split(/\s+/).filter(Boolean);
+    unsentWordsRef.current = words;
+
+    if (words.length >= 10) {
+      const wordsToSend = words.slice(0, 10).join(" ");
+      const remainingWords = words.slice(10).join(" ");
+      setInputValue(remainingWords);
+      unsentWordsRef.current = remainingWords
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean);
+
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+
+      sendPostRequest(wordsToSend);
+    } else {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+      timeoutRef.current = setTimeout(() => {
+        const unsent = unsentWordsRef.current;
+        if (unsent.length > 0 && unsent.length < 10) {
+          const textToSend = unsent.join(" ");
+          sendPostRequest(textToSend);
+          setInputValue("");
+          unsentWordsRef.current = [];
+        }
+      }, 3000);
     }
-  };
-
-  const handleAutoSearchChange = () => {
-    setAutoSearch((prev) => !prev);
   };
 
   return (
@@ -90,7 +123,15 @@ const AiTeaches = () => {
                 </label>
                 <input
                   type="text"
-                  onKeyDown={handleTagInputChange}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      const tag = (e.target as HTMLInputElement).value;
+                      if (tag.trim() && !tags.includes(tag)) {
+                        setTags((prevTags) => [...prevTags, tag]);
+                      }
+                      (e.target as HTMLInputElement).value = "";
+                    }
+                  }}
                   className="mt-2 border rounded p-2 w-full"
                   placeholder="Enter website link"
                 />
@@ -103,10 +144,15 @@ const AiTeaches = () => {
                       <span
                         key={index}
                         className="bg-blue-500 text-white rounded-full py-1 px-3 mr-2 mb-2 flex items-center"
+                        style={{
+                          display: "inline-flex",
+                          padding: "0.2rem 0.5rem",
+                          minWidth: "auto",
+                        }}
                       >
                         {tag}
                         <button
-                          onClick={() => handleDeleteTag(tag)}
+                          onClick={() => setTags(tags.filter((t) => t !== tag))}
                           className="ml-2 text-red-500 text-xs"
                         >
                           X
@@ -122,7 +168,7 @@ const AiTeaches = () => {
                   <input
                     type="checkbox"
                     checked={autoSearch}
-                    onChange={handleAutoSearchChange}
+                    onChange={() => setAutoSearch((prev) => !prev)}
                     className="mr-2"
                   />
                   Automatic Search
@@ -157,7 +203,27 @@ const AiTeaches = () => {
 
         <div className="flex items-center p-4 w-full">
           <div className="flex-grow">
-            <ChatInput onSendMessage={handleSendMessage} />
+            <ChatInput
+              value={inputValue}
+              onChange={handleInputChange}
+              onSendChunk={(text) => {
+                if (text.trim()) {
+                  sendPostRequest(text.trim());
+                }
+              }}
+              onSendMessage={() => {
+                if (inputValue.trim()) {
+                  if (timeoutRef.current) {
+                    clearTimeout(timeoutRef.current);
+                    timeoutRef.current = null;
+                  }
+                  const textToSend = inputValue.trim();
+                  setInputValue("");
+                  unsentWordsRef.current = [];
+                  sendPostRequest(textToSend);
+                }
+              }}
+            />
           </div>
           <div className="ml-2">
             <FaMicrophone className="text-white cursor-pointer" size={20} />
@@ -168,4 +234,4 @@ const AiTeaches = () => {
   );
 };
 
-export default AiTeaches;
+export default StudentTeaches;

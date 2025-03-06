@@ -2,32 +2,27 @@
 
 import { useState, useEffect, useRef } from "react";
 import ChatBubble from "@/components/ChatBubble";
-import ChatInput from "@/components/ChatInput";
-import { FaMicrophone } from "react-icons/fa"; // Removed FaTrash as it's no longer needed
+import { FaMicrophone, FaWindowRestore, FaMinus, FaStop } from "react-icons/fa";
+import { motion } from "framer-motion";
+
+interface Message {
+  text: string;
+  sender: "user" | "ai";
+}
 
 const StudentTeaches = () => {
-  const [messages, setMessages] = useState<
-    { text: string; sender: "user" | "ai" }[]
-  >([]);
-  const [isModalOpen, setIsModalOpen] = useState(true); // Popup state
-  const [tags, setTags] = useState<string[]>([]); // Store created tags
-  const [autoSearch, setAutoSearch] = useState(false);
-  const messageContainerRef = useRef<HTMLDivElement>(null);
+  const [messages, setMessages] = useState<Message[]>([]); // For chat history
+  const [mainChat, setMainChat] = useState<Message[]>([]); // For main chat window
+  const [inputText, setInputText] = useState(""); // For the input field
+  const [isApiProcessing, setIsApiProcessing] = useState(false); // To track API requests
+  const [historyMinimized, setHistoryMinimized] = useState(false); // For chat history window
+  const [historyPosition, setHistoryPosition] = useState({ x: 0, y: 0 }); // For draggable history
+  const [isSessionActive, setIsSessionActive] = useState(true); // To track session state
+  const [sentLength, setSentLength] = useState(0); // To track how much text has been sent
+  const messageContainerRef = useRef<HTMLDivElement>(null); // For auto-scrolling
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null); // For debounced submission
 
-  const handleSendMessage = (message: string) => {
-    setMessages((prevMessages) => [
-      ...prevMessages,
-      { text: message, sender: "user" },
-    ]);
-
-    setTimeout(() => {
-      setMessages((prevMessages) => [
-        ...prevMessages,
-        { text: `AI Response to: ${message}`, sender: "ai" },
-      ]);
-    }, 1000);
-  };
-
+  // Auto-scroll to the bottom of the chat when messages update
   useEffect(() => {
     if (messageContainerRef.current) {
       messageContainerRef.current.scrollTop =
@@ -35,121 +30,238 @@ const StudentTeaches = () => {
     }
   }, [messages]);
 
-  // Handle adding a tag
-  const handleAddTag = (tag: string) => {
-    if (tag.trim() && !tags.includes(tag)) {
-      setTags((prevTags) => [...prevTags, tag]);
+  // Handle text input changes
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newText = e.target.value;
+    setInputText(newText);
+
+    // Split into words and check if we have 10+ words beyond the sent length
+    const words = newText.trim().split(/\s+/).filter(Boolean);
+    const unsentWords = words.slice(sentLength); // Only consider unsent words
+
+    if (unsentWords.length >= 10) {
+      const wordsToSend = unsentWords.slice(0, 10).join(" ");
+
+      // Clear any pending timeout
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+
+      // Send the next 10 words
+      sendPostRequest(wordsToSend);
+
+      // Update the sent length
+      setSentLength((prev) => prev + 10);
+    } else {
+      // Set up debounced submission
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+
+      // Set new timeout for 5 seconds
+      timeoutRef.current = setTimeout(() => {
+        if (unsentWords.length > 0) {
+          sendPostRequest(unsentWords.join(" "));
+          setSentLength(words.length); // Mark all words as sent
+        }
+      }, 5000);
     }
   };
 
-  // Handle deleting a tag
-  const handleDeleteTag = (tag: string) => {
-    setTags((prevTags) => prevTags.filter((t) => t !== tag));
-  };
+  // Function to send a POST request for a chunk of text
+  const sendPostRequest = async (text: string) => {
+    if (!text.trim() || isApiProcessing) return;
 
-  // Handle input change and submission of tag
-  const handleTagInputChange = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
-      handleAddTag((e.target as HTMLInputElement).value);
-      (e.target as HTMLInputElement).value = ""; // Clear input after adding
+    setIsApiProcessing(true);
+
+    try {
+      const response = await fetch("https://auralis.shervintech.me/interrupt", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_input: text }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch response from API.");
+      }
+
+      let data = await response.json();
+      try {
+        data = JSON.parse(data.response);
+
+        // Append AI response to the main chat window
+        setMainChat((prev) => [
+          ...prev,
+          { text: data.response || "No response from AI.", sender: "ai" },
+        ]);
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      } catch (parseError) {
+        // Handle case where response isn't valid JSON
+        setMainChat((prev) => [
+          ...prev,
+          { text: data.response || "No response from AI.", sender: "ai" },
+        ]);
+      }
+    } catch (error) {
+      console.error("Error sending post request:", error);
+      setMainChat((prev) => [
+        ...prev,
+        { text: "Error fetching response. Please try again.", sender: "ai" },
+      ]);
+    } finally {
+      setIsApiProcessing(false);
     }
   };
 
-  // Handle checkbox change for Automatic Search
-  const handleAutoSearchChange = () => {
-    setAutoSearch((prev) => !prev);
+  // Handle key press in input field
+  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" && !e.shiftKey && inputText.trim()) {
+      e.preventDefault();
+      const words = inputText.trim().split(/\s+/).filter(Boolean);
+      const unsentWords = words.slice(sentLength);
+
+      if (unsentWords.length > 0) {
+        sendPostRequest(unsentWords.join(" "));
+        setSentLength(words.length); // Mark all words as sent
+      }
+    }
+  };
+
+  // Handle stop button click
+  const handleStop = () => {
+    const words = inputText.trim().split(/\s+/).filter(Boolean);
+    const unsentWords = words.slice(sentLength);
+
+    if (unsentWords.length > 0) {
+      sendPostRequest(unsentWords.join(" "));
+    }
+
+    // Add the full user text to the chat history
+    setMessages((prev) => [...prev, { text: inputText, sender: "user" }]);
+
+    // Clear input and end the session
+    setInputText("");
+    setSentLength(0);
+    setIsSessionActive(false);
+
+    // Clear any pending timeout
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
   };
 
   return (
-    <div className="flex justify-end flex-col h-screen bg-black-100">
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-black-700 bg-opacity-50 flex justify-center items-center">
-          <div className="bg-black p-6 rounded-md w-1/3 max-w-lg">
-            <h3 className="text-lg font-semibold mb-4 text-white">
-              Enter Details
-            </h3>
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-black-700">
-                Upload image/docs
-              </label>
-              <input type="file" className="mt-2 border rounded p-2 w-full" />
+    <div className="flex justify-center items-center h-screen bg-gradient-to-r from-black via-gray-800 to-black text-white">
+      <div className="w-[90vw] h-[90vh] rounded-3xl border border-white/[0.3] overflow-hidden backdrop-blur-3xl bg-opacity-50 relative">
+        {/* Draggable Chat History Box */}
+        <motion.div
+          drag
+          dragMomentum={false}
+          className="absolute top-8 right-8 z-10"
+          animate={{
+            width: historyMinimized ? "60px" : "300px",
+            height: historyMinimized ? "60px" : "400px",
+          }}
+          onDragEnd={(_, info) => {
+            setHistoryPosition({
+              x: historyPosition.x + info.offset.x,
+              y: historyPosition.y + info.offset.y,
+            });
+          }}
+          style={{
+            x: historyPosition.x,
+            y: historyPosition.y,
+          }}
+        >
+          <div className="bg-gray-900 border border-gray-700 rounded-lg shadow-lg overflow-hidden flex flex-col h-full">
+            <div className="flex justify-between items-center bg-gray-800 p-2 cursor-move">
+              {!historyMinimized && (
+                <div className="text-white text-sm">Chat History</div>
+              )}
+              <div className="flex space-x-2">
+                <button
+                  onClick={() => setHistoryMinimized(!historyMinimized)}
+                  className="text-white text-xs bg-gray-700 hover:bg-gray-600 p-1 rounded"
+                >
+                  {historyMinimized ? (
+                    <FaWindowRestore size={12} />
+                  ) : (
+                    <FaMinus size={12} />
+                  )}
+                </button>
+              </div>
             </div>
 
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-black-700">
-                Enter website links (press Enter to add)
-              </label>
+            {!historyMinimized && (
+              <div
+                ref={messageContainerRef}
+                className="flex-1 overflow-y-auto p-2 flex flex-col space-y-3"
+              >
+                {messages.length === 0 && (
+                  <div className="text-gray-500 text-xs text-center py-2">
+                    No messages yet
+                  </div>
+                )}
+
+                {messages.map((msg, index) => (
+                  <ChatBubble key={index} text={msg.text} sender={msg.sender} />
+                ))}
+              </div>
+            )}
+
+            {historyMinimized && (
+              <div className="flex items-center justify-center h-full">
+                <button
+                  onClick={() => setHistoryMinimized(!historyMinimized)}
+                  className="text-white text-xs bg-gray-700 hover:bg-gray-600 p-1 rounded"
+                >
+                  Chat History
+                </button>
+              </div>
+            )}
+          </div>
+        </motion.div>
+
+        {/* Main Chat Window */}
+        <div className="p-4 h-[calc(90vh-80px)] overflow-y-auto">
+          {mainChat.map((msg, index) => (
+            <ChatBubble key={index} text={msg.text} sender={msg.sender} />
+          ))}
+        </div>
+
+        {/* Input Area */}
+        <div className="absolute bottom-0 left-0 right-0 p-4 bg-gray-900 border-t border-gray-800">
+          <div className="flex items-center">
+            <button className="p-2 rounded-full bg-gray-800 mr-3">
+              <FaMicrophone className="text-white" size={18} />
+            </button>
+
+            <div className="flex-1 relative">
               <input
                 type="text"
-                onKeyDown={handleTagInputChange}
-                className="mt-2 border rounded p-2 w-full"
-                placeholder="Enter website link"
+                value={inputText}
+                onChange={handleInputChange}
+                onKeyPress={handleKeyPress}
+                className="w-full px-4 py-3 bg-gray-800 text-white border border-gray-700 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Type a message... (auto-sends at 10 words or after 5s)"
+                disabled={!isSessionActive} // Disable input if session is inactive
               />
-              {tags.length > 0 && (
-                <div
-                  className="overflow-y-auto max-h-40 border p-2 mb-2 rounded mt-2"
-                  style={{ maxHeight: "200px" }}
-                >
-                  {tags.map((tag, index) => (
-                    <span
-                      key={index}
-                      className="bg-blue-500 text-white rounded-full py-1 px-3 mr-2 mb-2 flex items-center"
-                      style={{
-                        display: "inline-flex",
-                        padding: "0.2rem 0.5rem",
-                        minWidth: "auto",
-                      }}
-                    >
-                      {tag}
-                      <button
-                        onClick={() => handleDeleteTag(tag)}
-                        className="ml-2 text-red-500 text-xs"
-                      >
-                        X
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
 
-            <div className="mb-4">
-              <label className="flex items-center">
-                <input
-                  type="checkbox"
-                  checked={autoSearch}
-                  onChange={handleAutoSearchChange}
-                  className="mr-2"
-                />
-                Automatic Search
-              </label>
+              <div className="absolute right-3 top-3 text-xs text-gray-400">
+                {inputText.trim().split(/\s+/).filter(Boolean).length} words
+              </div>
             </div>
 
             <button
-              onClick={() => setIsModalOpen(false)}
-              className="bg-blue-500 text-white px-4 py-2 rounded-md w-full"
+              className="ml-3 p-2 rounded-full bg-red-600 hover:bg-red-700 transition-colors"
+              onClick={handleStop}
+              disabled={!isSessionActive} // Disable button if session is inactive
             >
-              Submit
+              <FaStop className="text-white" size={18} />
             </button>
           </div>
-        </div>
-      )}
-
-      <div
-        ref={messageContainerRef}
-        className="overflow-y-auto p-4 flex flex-col"
-      >
-        {messages.map((msg, index) => (
-          <ChatBubble key={index} text={msg.text} sender={msg.sender} />
-        ))}
-      </div>
-
-      <div className="flex items-center p-4 w-full">
-        <div className="flex-grow">
-          <ChatInput onSendMessage={handleSendMessage} />
-        </div>
-        <div className="ml-2">
-          <FaMicrophone className="text-white cursor-pointer" size={20} />
         </div>
       </div>
     </div>
