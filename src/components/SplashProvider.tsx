@@ -10,7 +10,7 @@ const SplashScreen: React.FC = () => {
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 1.5 }}
-      className="fixed inset-0 flex items-center justify-center bg-black text-white text-3xl font-bold font-powerGrotesk"
+      className="fixed inset-0 flex items-center justify-center bg-black text-white text-[20rem] font-bold font-powerGrotesk"
     >
       Auralis
     </motion.div>
