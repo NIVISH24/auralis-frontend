@@ -4,6 +4,7 @@ import { NextPage } from "next";
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
+import axios from "axios";
 
 interface Conversation {
   id: number;
@@ -21,7 +22,9 @@ const Home: NextPage = () => {
 
   // New Model Creation States
   const [newModelName, setNewModelName] = useState("");
-  const [fileSelection, setFileSelection] = useState<"single" | "folder">("single");
+  const [fileSelection, setFileSelection] = useState<"single" | "folder">(
+    "single"
+  );
   const [websiteInput, setWebsiteInput] = useState("");
   const [websiteLinks, setWebsiteLinks] = useState<string[]>([]);
   const [automaticSearch, setAutomaticSearch] = useState(false);
@@ -29,8 +32,9 @@ const Home: NextPage = () => {
   // Fetch models when modal opens
   useEffect(() => {
     if (isModalOpen) {
-      fetch("https://auralispy.shervintech.me/models")
-        .then((res) => res.json())
+      axios
+        .get("https://p8g556vw-8000.inc1.devtunnels.ms/models")
+        .then((res) => res.data)
         .then((data) => setModels(data.models))
         .catch((error) => console.error("Error fetching models:", error));
     }
@@ -58,15 +62,28 @@ const Home: NextPage = () => {
   const handleNewModelSubmit = async () => {
     const formData = new FormData();
     formData.append("model_name", newModelName);
-    formData.append("automatic_search", automaticSearch ? "true" : "false");
-    // Additional dummy values for pdf/img and website links can be added later
+    formData.append("topic", newModelName);
+    // formData.append("rag_files", fileSelection);
+    for (const [key, value] of formData.entries()) {
+      console.log(key, value);
+    }
+    const fileInput = document.querySelector(
+      'input[type="file"]'
+    ) as HTMLInputElement;
+    if (fileInput && fileInput.files && fileInput.files.length > 0) {
+      formData.append("rag_files", fileInput.files[0]);
+    }
+
     try {
-      const res = await fetch("https://auralispy.shervintech.me/upload", {
-        method: "POST",
-        body: formData,
-      });
-      if (res.ok) {
-        // Update models list with the new model
+      const res = await axios.post(
+        "https://p8g556vw-8000.inc1.devtunnels.ms/upload",
+        formData,
+        {
+          timeout: 30 * 60 * 1000,
+        }
+      );
+
+      if (res.status === 200) {
         setModels((prev) => [...prev, newModelName]);
         setIsNewModelModalOpen(false);
         setNewModelName("");
@@ -78,11 +95,16 @@ const Home: NextPage = () => {
       }
     } catch (error) {
       console.error("Error uploading model:", error);
+      if (axios.isAxiosError(error) && error.response?.data?.detail) {
+        console.error("Backend error details:", error.response.data.detail);
+      }
     }
   };
 
   // Add website links on comma press
-  const handleWebsiteInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleWebsiteInputKeyDown = (
+    e: React.KeyboardEvent<HTMLInputElement>
+  ) => {
     if (e.key === ",") {
       e.preventDefault();
       const trimmed = websiteInput.trim();
@@ -122,7 +144,8 @@ const Home: NextPage = () => {
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.5, duration: 1 }}
       >
-        &quot;Embrace the future of learning with AI — where knowledge meets innovation.&quot;
+        &quot;Embrace the future of learning with AI — where knowledge meets
+        innovation.&quot;
       </motion.p>
       <motion.div
         className="flex flex-col items-center space-y-4 mb-8"
@@ -145,7 +168,10 @@ const Home: NextPage = () => {
             <div className="w-full h-full flex flex-col justify-center items-center relative">
               {/* Plus sign to open new model creation modal */}
               <div className="absolute top-4 right-4">
-                <button onClick={() => setIsNewModelModalOpen(true)} className="text-4xl text-white">
+                <button
+                  onClick={() => setIsNewModelModalOpen(true)}
+                  className="text-4xl text-white"
+                >
                   +
                 </button>
               </div>
@@ -180,7 +206,9 @@ const Home: NextPage = () => {
             // Mode Selection View
             <div className="w-full h-full flex flex-col justify-center items-center">
               <div className="bg-gradient-to-r from-black via-gray-900 to-black border border-gray-700 rounded-lg p-6 shadow-lg">
-                <h2 className="text-xl font-bold mb-4">Selected Model: {selectedModel}</h2>
+                <h2 className="text-xl font-bold mb-4">
+                  Selected Model: {selectedModel}
+                </h2>
                 <p className="mb-4">Choose a mode:</p>
                 <div className="flex space-x-4">
                   <button
@@ -252,7 +280,13 @@ const Home: NextPage = () => {
               {fileSelection === "single" ? (
                 <input type="file" accept=".pdf" className="mt-2" />
               ) : (
-                <input type="file" ref={(input) => { if (input) input.webkitdirectory = true; }} className="mt-2" />
+                <input
+                  type="file"
+                  ref={(input) => {
+                    if (input) input.webkitdirectory = true;
+                  }}
+                  className="mt-2"
+                />
               )}
             </div>
             <div className="mb-4">
@@ -268,9 +302,17 @@ const Home: NextPage = () => {
               />
               <div className="flex flex-wrap mt-2">
                 {websiteLinks.map((link) => (
-                  <div key={link} className="bg-gray-800 px-2 py-1 mr-2 mb-2 rounded-full flex items-center">
+                  <div
+                    key={link}
+                    className="bg-gray-800 px-2 py-1 mr-2 mb-2 rounded-full flex items-center"
+                  >
                     <span className="mr-1">{link}</span>
-                    <button onClick={() => removeWebsiteLink(link)} className="text-red-500">x</button>
+                    <button
+                      onClick={() => removeWebsiteLink(link)}
+                      className="text-red-500"
+                    >
+                      x
+                    </button>
                   </div>
                 ))}
               </div>
