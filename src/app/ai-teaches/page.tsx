@@ -68,7 +68,7 @@ const AiTeaches = () => {
 
     try {
       const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
-
+    
       const promptData = {
         contents: [
           {
@@ -344,7 +344,7 @@ const AiTeaches = () => {
                 onClick={handleStartChatting}
                 className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 rounded-lg w-full font-medium transition-colors duration-200 flex items-center justify-center"
               >
-                <span>Generate Subtopics</span>
+                <span>Generate </span>
                 <FaPaperPlane className="ml-2" />
               </button>
             </motion.div>
