@@ -33,7 +33,7 @@ const Home: NextPage = () => {
   useEffect(() => {
     if (isModalOpen) {
       axios
-        .get("https://p8g556vw-8000.inc1.devtunnels.ms/models")
+        .get("https://auralispy.shervintech.me/models")
         .then((res) => res.data)
         .then((data) => setModels(data.models))
         .catch((error) => console.error("Error fetching models:", error));
@@ -76,7 +76,7 @@ const Home: NextPage = () => {
 
     try {
       const res = await axios.post(
-        "https://p8g556vw-8000.inc1.devtunnels.ms/upload",
+        "https://auralispy.shervintech.me/upload",
         formData,
         {
           timeout: 30 * 60 * 1000,
@@ -129,7 +129,7 @@ const Home: NextPage = () => {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-r from-black via-gray-900 to-black text-white relative">
+    <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-r from-black via-[#21124b] to-black text-white relative">
       <motion.h1
         className="text-8xl font-extrabold text-center mb-6"
         initial={{ opacity: 0, y: -50 }}
@@ -163,25 +163,25 @@ const Home: NextPage = () => {
 
       {/* Model Selection Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-75 z-50">
+        <div className="fixed inset-0 flex items-center justify-center bg-gradient-to-r from-black via-[#21124b] to-black bg-opacity-75 z-50">
           {!selectedModel ? (
             <div className="w-full h-full flex flex-col justify-center items-center relative">
               {/* Plus sign to open new model creation modal */}
-              <div className="absolute top-4 right-4">
+              <div className="absolute top-24 right-24">
                 <button
                   onClick={() => setIsNewModelModalOpen(true)}
-                  className="text-4xl text-white"
+                  className="text-9xl text-white cursor-pointer border border-white/[0.3] rounded-3xl px-8 pb-4"
                 >
                   +
                 </button>
               </div>
-              <div className="grid grid-rows-2 gap-4 w-full px-4">
+              <div className="grid  grid-rows-2 gap-4 w-full px-4">
                 <div className="flex justify-center space-x-4">
                   {firstRow.map((model) => (
                     <motion.div
                       key={model}
                       onClick={() => handleModelClick(model)}
-                      className="p-4 bg-gray-800 rounded-lg text-white cursor-pointer"
+                      className="p-4 bg-blue-800 rounded-lg text-white cursor-pointer"
                       whileHover={{ scale: 1.05 }}
                     >
                       {model}
@@ -193,7 +193,7 @@ const Home: NextPage = () => {
                     <motion.div
                       key={model}
                       onClick={() => handleModelClick(model)}
-                      className="p-4 bg-gray-800 rounded-lg text-white cursor-pointer"
+                      className="p-4 bg-blue-800 rounded-lg text-white cursor-pointer"
                       whileHover={{ scale: 1.05 }}
                     >
                       {model}
@@ -205,7 +205,7 @@ const Home: NextPage = () => {
           ) : (
             // Mode Selection View
             <div className="w-full h-full flex flex-col justify-center items-center">
-              <div className="bg-gradient-to-r from-black via-gray-900 to-black border border-gray-700 rounded-lg p-6 shadow-lg">
+              <div className="bg-gradient-to-r from-black via-[#21124b] to-black border border-gray-700 rounded-lg p-6 shadow-lg">
                 <h2 className="text-xl font-bold mb-4">
                   Selected Model: {selectedModel}
                 </h2>
@@ -241,7 +241,7 @@ const Home: NextPage = () => {
       {/* New Model Creation Modal */}
       {isNewModelModalOpen && (
         <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-75 z-60">
-          <div className="bg-gradient-to-r from-black via-gray-900 to-black border border-gray-700 rounded-lg p-6 shadow-lg w-96">
+          <div className="bg-gradient-to-r from-black via-[#21124b] to-black border border-gray-700 rounded-lg p-6 shadow-lg w-96">
             <h2 className="text-xl font-bold mb-4">Create New Model</h2>
             <div className="mb-4">
               <label className="block mb-1">Model Name</label>
@@ -351,7 +351,7 @@ const Home: NextPage = () => {
         {conversations.map((conv) => (
           <motion.div
             key={conv.id}
-            className="bg-gradient-to-r from-black via-gray-900 to-black border border-gray-700 rounded-lg p-4 shadow-lg backdrop-blur-sm"
+            className="bg-gradient-to-r from-black via-[#21124b] to-black border border-gray-700 rounded-lg p-4 shadow-lg backdrop-blur-sm"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
@@ -370,7 +370,7 @@ const Home: NextPage = () => {
       >
         <p>Powered by AI — The Future of Education</p>
       </motion.footer>
-      <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-full h-56 bg-gradient-to-r from-black via-gray-900 to-black rounded-b-full shadow-2xl opacity-60 animate-pulse z-0"></div>
+      <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-full h-56 bg-gradient-to-r from-black via-[#21124b] to-black rounded-b-full shadow-2xl opacity-60 animate-pulse z-0"></div>
     </div>
   );
 };
